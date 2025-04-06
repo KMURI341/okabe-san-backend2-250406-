@@ -8,13 +8,13 @@ from ...api.auth.jwt import get_current_user
 from ...api.users.models import User
 from ...api.troubles.models import Trouble
 from .models import Message
-from .schemas import MessageCreate, MessageResponse, MessagesListResponse  # ここを修正
+from . import schemas
 
 router = APIRouter()
 
-@router.post("/", response_model=MessageResponse)
+@router.post("/", response_model=schemas.MessageResponse)
 def create_message(
-    message: MessageCreate,
+    message: schemas.MessageCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -40,16 +40,16 @@ def create_message(
     db.commit()
     db.refresh(new_message)
     
-    return {
-        "id": new_message.id,
-        "content": new_message.content,
-        "user_id": new_message.user_id,
-        "user_name": current_user.name,
-        "trouble_id": new_message.trouble_id,
-        "created_at": new_message.created_at
-    }
+    return schemas.MessageResponse(
+        id=new_message.id,
+        content=new_message.content,
+        user_id=new_message.user_id,
+        user_name=current_user.name,
+        trouble_id=new_message.trouble_id,
+        created_at=new_message.created_at
+    )
 
-@router.get("/trouble/{trouble_id}", response_model=MessagesListResponse)
+@router.get("/trouble/{trouble_id}", response_model=schemas.MessagesListResponse)
 def get_messages_by_trouble(
     trouble_id: int,
     skip: int = Query(0, ge=0),
@@ -77,16 +77,16 @@ def get_messages_by_trouble(
     message_responses = []
     for msg in messages:
         user = db.query(User).filter(User.id == msg.user_id).first()
-        message_responses.append({
-            "id": msg.id,
-            "content": msg.content,
-            "user_id": msg.user_id,
-            "user_name": user.name if user else "Unknown",
-            "trouble_id": msg.trouble_id,
-            "created_at": msg.created_at
-        })
+        message_responses.append(schemas.MessageResponse(
+            id=msg.id,
+            content=msg.content,
+            user_id=msg.user_id,
+            user_name=user.name if user else "Unknown",
+            trouble_id=msg.trouble_id,
+            created_at=msg.created_at
+        ))
     
-    return {
-        "messages": message_responses,
-        "total": total
-    }
+    return schemas.MessagesListResponse(
+        messages=message_responses,
+        total=total
+    )
