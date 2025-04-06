@@ -4,15 +4,16 @@ import uvicorn
 import sys
 import os
 
-# プロジェクトのルートディレクトリをパスに追加
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# パスの追加（実行ディレクトリをモジュール検索パスに追加）
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # APIルーターのインポート
-from app.api.troubles.router import router as troubles_router
-from app.api.messages.router import router as messages_router
 from app.api.projects.router import router as projects_router
 from app.api.users.router import router as users_router
 from app.api.auth.router import router as auth_router
+# 後でコメントアウトを外します
+# from app.api.troubles.router import router as troubles_router
+# from app.api.messages.router import router as messages_router
 
 app = FastAPI(
     title="CollaboGames Backend API",
@@ -23,7 +24,7 @@ app = FastAPI(
 # CORSミドルウェアの設定
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # フロントエンドのオリジンに置き換えてください
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -33,8 +34,9 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/api/auth", tags=["認証"])
 app.include_router(users_router, prefix="/api/users", tags=["ユーザー"])
 app.include_router(projects_router, prefix="/api/projects", tags=["プロジェクト"])
-app.include_router(troubles_router, prefix="/api/troubles", tags=["お困りごと"])
-app.include_router(messages_router, prefix="/api/messages", tags=["メッセージ"])
+# 後でコメントアウトを外します
+# app.include_router(troubles_router, prefix="/api/troubles", tags=["お困りごと"])
+# app.include_router(messages_router, prefix="/api/messages", tags=["メッセージ"])
 
 @app.get("/")
 def read_root():
