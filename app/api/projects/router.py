@@ -12,16 +12,13 @@ from app.api.projects.schemas import (
     ProjectCategoryResponse,
     RankingUser
 )
-from app.api.users.models import User
+from app.api.users.models import User  # User モデル側も、creator_user_id / projects 関係を持つ前提
 
 router = APIRouter()
 
 @router.get("/", response_model=ProjectListResponse)
-def get_projects(
-    user_id: int, 
-    db: Session = Depends(get_db)
-):
-    # 新着プロジェクト
+def get_projects(user_id: int, db: Session = Depends(get_db)):
+    # 新着プロジェクトを取得（co_creation_projects テーブルから）
     new_projects = (
         db.query(Project)
         .order_by(Project.created_at.desc())
@@ -29,7 +26,7 @@ def get_projects(
         .all()
     )
 
-    # お気に入りプロジェクト
+    # お気に入りプロジェクト：UserFavoriteProject を JOIN してフィルター
     favorite_projects = (
         db.query(Project)
         .join(UserFavoriteProject)
@@ -39,28 +36,30 @@ def get_projects(
         .all()
     )
 
-    # プロジェクト総数
+    # プロジェクト総数を取得
     total_projects = db.query(Project).count()
 
-    # プロジェクトをレスポンススキーマに変換
-    def convert_project(project):
-        # ダミーのいいね数とコメント数
-        likes = 24  # TODO: 実際のロジックに置き換える
-        comments = 8  # TODO: 実際のロジックに置き換える
-        
-        # お気に入り判定
-        is_favorite = db.query(UserFavoriteProject).filter(
-            UserFavoriteProject.user_id == user_id,
-            UserFavoriteProject.project_id == project.id
-        ).first() is not None
+    # プロジェクトをレスポンス用に変換するローカル関数
+    def convert_project(project: Project) -> ProjectResponse:
+        likes = 24  # ダミーのいいね数（後ほど実際のロジックに置き換える）
+        comments = 8  # ダミーのコメント数（後ほど実際のロジックに置き換える）
+        is_favorite = (
+            db.query(UserFavoriteProject)
+            .filter(
+                UserFavoriteProject.user_id == user_id,
+                UserFavoriteProject.project_id == project.project_id
+            )
+            .first() is not None
+        )
 
         return ProjectResponse(
-            id=project.id,
+            id=project.project_id,            # models.py で定義した project_id を使用
             title=project.title,
             description=project.description,
-            category=project.category,
-            author_id=project.author_id,
-            author=project.author.name,  # ユーザー名を取得
+            # ここでは summary を category として返す例です（必要に応じて調整してください）
+            category=project.summary if project.summary else "",
+            author_id=project.creator_user_id,  # models.py で定義した creator_user_id を使用
+            author=project.creator.name,         # リレーション名は creator として定義
             created_at=project.created_at,
             likes=likes,
             comments=comments,
@@ -75,7 +74,7 @@ def get_projects(
 
 @router.get("/categories", response_model=ProjectCategoryResponse)
 def get_project_categories(db: Session = Depends(get_db)):
-    # プロジェクトカテゴリーの一覧を取得
+    # プロジェクトカテゴリー一覧（固定値）
     categories = [
         "テクノロジー", 
         "デザイン", 
@@ -90,8 +89,7 @@ def get_project_categories(db: Session = Depends(get_db)):
 
 @router.get("/ranking", response_model=List[RankingUser])
 def get_activity_ranking(db: Session = Depends(get_db)):
-    # TODO: 実際のポイント計算ロジックに置き換える
-    # 現時点では、ダミーデータを返す
+    # ダミーデータ
     ranking_data = [
         RankingUser(name="キツネ", points=1250, rank=1),
         RankingUser(name="パンダ", points=980, rank=2),
@@ -100,24 +98,7 @@ def get_activity_ranking(db: Session = Depends(get_db)):
     return ranking_data
 
 @router.post("/create")
-def create_project(
-    project: ProjectCreate, 
-    db: Session = Depends(get_db)
-):
-    # プロジェクト作成のバリデーションを追加
+def create_project(project: ProjectCreate, db: Session = Depends(get_db)):
+    # 必要項目のバリデーション
     if not project.title or not project.description or not project.category:
         raise HTTPException(status_code=400, detail="全ての項目を入力してください")
-
-    # プロジェクトを作成
-    new_project = Project(
-        title=project.title,
-        description=project.description,
-        category=project.category,
-        author_id=project.author_id
-    )
-    
-    db.add(new_project)
-    db.commit()
-    db.refresh(new_project)
-
-    return {"message": "プロジェクトを登録しました", "project_id": new_project.id}

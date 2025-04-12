@@ -2,34 +2,29 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Bool
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
-# 相対インポートに変更
 from ...models.base import Base
 
 class Project(Base):
-    __tablename__ = "projects"
+    __tablename__ = "co_creation_projects"
 
-    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, primary_key=True, index=True)
     title = Column(String, index=True, nullable=False)
+    summary = Column(String(1000), nullable=True)
     description = Column(Text, nullable=False)
-    category = Column(String, nullable=False)
-    author_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    creator_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    # リレーションシップ (文字列参照を使用)
-    author = relationship("User", back_populates="projects")
+
+    creator = relationship("User", back_populates="projects")
     troubles = relationship("Trouble", back_populates="project")
     user_favorites = relationship("UserFavoriteProject", back_populates="project")
-    # Project クラス内のリレーションシップに追加
-    troubles = relationship("Trouble", back_populates="project")
 
 class UserFavoriteProject(Base):
     __tablename__ = "user_favorite_projects"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
-    
-    # リレーションシップ
+    project_id = Column(Integer, ForeignKey("co_creation_projects.project_id"), nullable=False)
+
     user = relationship("User", back_populates="favorite_projects")
     project = relationship("Project", back_populates="user_favorites")

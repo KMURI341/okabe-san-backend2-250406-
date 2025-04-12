@@ -23,7 +23,7 @@ class ProjectResponse(ProjectBase):
     is_favorite: bool = False
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class ProjectListResponse(BaseModel):
     new_projects: List[ProjectResponse]
