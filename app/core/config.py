@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 from pydantic import BaseSettings  # pydantic_settingsではなくpydantic
+=======
+from pydantic_settings import BaseSettings
+>>>>>>> ff13e650aa280a9bae6aba74e2d684947458f107
 import os
 from dotenv import load_dotenv
 
@@ -10,6 +14,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = os.getenv("PROJECT_NAME", "CollaboGames")
     DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"
 
+<<<<<<< HEAD
     # Azure MySQL設定
     AZURE_MYSQL_HOST: str = os.getenv("AZURE_MYSQL_HOST", "")
     AZURE_MYSQL_USER: str = os.getenv("AZURE_MYSQL_USER", "")
@@ -37,6 +42,10 @@ class Settings(BaseSettings):
             ssl_args = "?ssl_mode=REQUIRED"
         
         return f"mysql+pymysql://{self.AZURE_MYSQL_USER}:{self.AZURE_MYSQL_PASSWORD}@{self.AZURE_MYSQL_HOST}:{self.AZURE_MYSQL_PORT}/{self.AZURE_MYSQL_DATABASE}{ssl_args}"
+=======
+    # データベース設定
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./test.db")
+>>>>>>> ff13e650aa280a9bae6aba74e2d684947458f107
 
     # セキュリティ設定
     SECRET_KEY: str = os.getenv("SECRET_KEY", "fallback_secret_key_please_change_in_production")
