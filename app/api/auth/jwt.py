@@ -21,7 +21,7 @@ def authenticate_user(db: Session, username: str, password: str) -> Optional[Use
     """
     print(f"認証試行: username={username}")
     
-    # ユーザーを検索
+    # Azure DB からユーザーを検索
     user = db.query(User).filter(User.name == username).first()
     
     if not user:
@@ -35,12 +35,12 @@ def authenticate_user(db: Session, username: str, password: str) -> Optional[Use
         print("テスト用パスワードで認証成功")
         return user
         
-    # 通常のパスワード検証（user.password フィールドが使用されている場合）
-    if hasattr(user, 'hashed_password') and verify_password(password, user.hashed_password):
-        print("ハッシュ化パスワードで認証成功")
+    # パスワードの検証
+    if verify_password(password, user.password):
+        print("パスワード検証成功")
         return user
     
-    print("パスワード検証に失敗")
+    print("パスワード検証失敗")
     return None
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:

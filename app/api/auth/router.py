@@ -14,64 +14,29 @@ from ..users.schemas import UserCreate, UserResponse, Token
 
 router = APIRouter()
 
-@router.post("/token", response_model=Token)
-def login_for_access_token(
-    form_data: OAuth2PasswordRequestForm = Depends(), 
-    db: Session = Depends(get_db)
-) -> Any:
-    """
-    OAuth2互換のトークンログインエンドポイント
-    """
-    # ユーザーを認証
-    user = authenticate_user(db, form_data.username, form_data.password)
-    
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="ユーザー名またはパスワードが無効です",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    # アクセストークンを生成
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.user_id}, 
-        expires_delta=access_token_expires
-    )
-    
-    return {
-        "access_token": access_token, 
-        "token_type": "bearer",
-        "user_id": user.user_id,
-        "user_name": user.name
-    }
-
-# app/api/auth/router.py の login 関数を修正
 @router.post("/login", response_model=Token)
 def login(
-    username: str,
-    password: str,
+    form_data: OAuth2PasswordRequestForm = Depends(), 
     db: Session = Depends(get_db)
 ) -> Any:
     """
     ユーザー名とパスワードでログイン
     """
-    print(f"ログインリクエスト受信: username={username}, password={'*' * len(password)}")
+    print(f"ログインリクエスト受信: username={form_data.username}")
     
-    # ユーザーを認証
-    user = authenticate_user(db, username, password)
+    # Azure DB からユーザーを認証
+    user = authenticate_user(db, form_data.username, form_data.password)
     
     if not user:
-        print(f"認証失敗: ユーザー '{username}' の認証に失敗しました")
+        print(f"認証失敗: ユーザー '{form_data.username}' の認証に失敗しました")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="ユーザー名またはパスワードが無効です",
         )
     
-    print(f"認証成功: ユーザー '{username}' (ID: {user.user_id})")
+    print(f"認証成功: ユーザー '{form_data.username}' (ID: {user.user_id})")
     
     # 最終ログイン時間を更新
-    from datetime import datetime
     user.last_login_at = datetime.utcnow()
     db.commit()
     
@@ -82,18 +47,12 @@ def login(
         expires_delta=access_token_expires
     )
     
-    print(f"トークン発行: user_id={user.user_id}, name={user.name}")
-    
-    # レスポンスデータを作成
-    response_data = {
+    return {
         "access_token": access_token, 
         "token_type": "bearer",
         "user_id": user.user_id,
         "user_name": user.name
     }
-    print(f"レスポンスデータ: {response_data}")
-    
-    return response_data
 
 @router.post("/register", response_model=Token)
 def register_user(
@@ -103,7 +62,6 @@ def register_user(
     """
     新規ユーザー登録
     """
-    print(f"受信データ: {user_data}")
     # パスワード確認
     if user_data.password != user_data.confirm_password:
         raise HTTPException(
@@ -111,7 +69,7 @@ def register_user(
             detail="パスワードが一致しません",
         )
     
-    # ユーザー名の重複チェック
+    # Azure DB でユーザー名の重複チェック
     existing_user = db.query(User).filter(User.name == user_data.name).first()
     if existing_user:
         raise HTTPException(
@@ -121,12 +79,13 @@ def register_user(
     
     now = datetime.utcnow()
     
-    # 新しいユーザーを作成
+    # 新しいユーザーを作成して Azure DB に保存
     user = User(
         name=user_data.name,
-        hashed_password=get_password_hash(user_data.password),
-        point_total=0,  # point_total フィールドを使用
-        last_login_at=now  # 最終ログイン時間を設定
+        password=get_password_hash(user_data.password),
+        categories=",".join(user_data.categories) if user_data.categories else "",
+        point_total=0,
+        last_login_at=datetime.utcnow()
     )
     
     # カテゴリーがあれば設定
