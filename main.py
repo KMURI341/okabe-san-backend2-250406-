@@ -39,10 +39,10 @@ app = FastAPI(
 # ───────── CORSミドルウェアの設定 ─────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 開発環境では "*" で全許可
+    allow_origins=["http://localhost:3000"],  # フロントエンドのオリジン
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # すべてのHTTPメソッドを許可
+    allow_headers=["*"],  # すべてのヘッダーを許可
 )
 
 # ───────── Startup イベント：テーブル自動生成 ─────────
@@ -55,6 +55,19 @@ async def startup_event():
         Base.metadata.create_all(bind=engine)
     else:
         print("テーブルは既に存在しています。スキーマ変更は行いません。")
+
+async def startup_db_client():
+    try:
+        from app.core.database import SessionLocal
+        db = SessionLocal()
+        # 簡単なクエリを実行してみる
+        db.execute("SELECT 1")
+        print("データベース接続テスト成功")
+        db.close()
+    except Exception as e:
+        print(f"データベース接続エラー: {str(e)}")
+        import traceback
+        traceback.print_exc()
 
 # ───────── 各種ルーターの追加 ─────────
 app.include_router(auth_router, prefix="/api/auth", tags=["認証"])

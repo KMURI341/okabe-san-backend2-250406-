@@ -13,35 +13,40 @@ from ..users.models import User
 from ..users.schemas import TokenData
 
 # OAuth2のパスワードベアラースキーマを定義
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
 def authenticate_user(db: Session, username: str, password: str) -> Optional[User]:
-    """
-    ユーザー名とパスワードでユーザーを認証する
-    """
-    print(f"認証試行: username={username}")
-    
-    # Azure DB からユーザーを検索
-    user = db.query(User).filter(User.name == username).first()
-    
-    if not user:
-        print(f"ユーザーが見つかりません: {username}")
-        return None
-    
-    print(f"ユーザーが見つかりました: {user.name}, password field: {user.password}")
-    
-    # テスト環境用の簡易認証（テスト用パスワードでの認証）
-    if password == "password" or password == user.password:
-        print("テスト用パスワードで認証成功")
-        return user
+    """ユーザー名とパスワードでユーザーを認証する"""
+    try:
+        print(f"認証試行: username={username}, password={password}")
         
-    # パスワードの検証
-    if verify_password(password, user.password):
-        print("パスワード検証成功")
-        return user
-    
-    print("パスワード検証失敗")
-    return None
+        # データベースからユーザーを検索
+        user = db.query(User).filter(User.name == username).first()
+        
+        if not user:
+            print(f"ユーザーが見つかりません: {username}")
+            return None
+        
+        print(f"ユーザーが見つかりました: {user.name}, ハッシュパスワード: {user.password}")
+        
+        # 開発環境での簡易認証（本番環境では削除する）
+        if password == user.password:
+            print("パスワードが完全一致")
+            return user
+            
+        # 通常の認証処理
+        if verify_password(password, user.password):
+            print("パスワード検証成功")
+            return user
+        
+        print("パスワード検証失敗")
+        return None
+    except Exception as e:
+        # エラーの詳細をログ出力
+        print(f"認証エラー: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """

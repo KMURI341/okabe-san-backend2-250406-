@@ -22,37 +22,62 @@ def login(
     """
     ユーザー名とパスワードでログイン
     """
-    print(f"ログインリクエスト受信: username={form_data.username}")
-    
-    # Azure DB からユーザーを認証
-    user = authenticate_user(db, form_data.username, form_data.password)
-    
-    if not user:
-        print(f"認証失敗: ユーザー '{form_data.username}' の認証に失敗しました")
+    try:
+        print(f"ログインリクエスト受信: username={form_data.username}, password={form_data.password}")
+        
+        # Azure DBからユーザーを認証
+        user = authenticate_user(db, form_data.username, form_data.password)
+        
+        if not user:
+            print(f"認証失敗: ユーザー '{form_data.username}' の認証に失敗しました")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="ユーザー名またはパスワードが無効です",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        print(f"認証成功: ユーザー '{form_data.username}' (ID: {user.user_id})")
+        
+        # 最終ログイン時間を更新
+        try:
+            user.last_login_at = datetime.utcnow()
+            db.commit()
+        except Exception as e:
+            print(f"ログイン時間の更新エラー: {str(e)}")
+            db.rollback()  # エラー時はロールバック
+        
+        # アクセストークンを生成
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        try:
+            access_token = create_access_token(
+                data={"sub": str(user.user_id)},  # 文字列に変換して確実に処理できるようにする
+                expires_delta=access_token_expires
+            )
+        except Exception as e:
+            print(f"トークン生成エラー: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="認証トークンの生成に失敗しました",
+            )
+        
+        return {
+            "access_token": access_token, 
+            "token_type": "bearer",
+            "user_id": user.user_id,
+            "user_name": user.name
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"ログイン処理中のエラー: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="ユーザー名またはパスワードが無効です",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal Server Error",
         )
-    
-    print(f"認証成功: ユーザー '{form_data.username}' (ID: {user.user_id})")
-    
-    # 最終ログイン時間を更新
-    user.last_login_at = datetime.utcnow()
-    db.commit()
-    
-    # アクセストークンを生成
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.user_id},
-        expires_delta=access_token_expires
-    )
-    
-    return {
-        "access_token": access_token, 
-        "token_type": "bearer",
-        "user_id": user.user_id,
-        "user_name": user.name
-    }
 
 @router.post("/register", response_model=Token)
 def register_user(
@@ -69,7 +94,7 @@ def register_user(
             detail="パスワードが一致しません",
         )
     
-    # Azure DB でユーザー名の重複チェック
+    # Azure DBでユーザー名の重複チェック
     existing_user = db.query(User).filter(User.name == user_data.name).first()
     if existing_user:
         raise HTTPException(
@@ -77,9 +102,7 @@ def register_user(
             detail="このユーザー名は既に使用されています",
         )
     
-    now = datetime.utcnow()
-    
-    # 新しいユーザーを作成して Azure DB に保存
+    # 新しいユーザーを作成してAzure DBに保存
     user = User(
         name=user_data.name,
         password=get_password_hash(user_data.password),
@@ -87,10 +110,6 @@ def register_user(
         point_total=0,
         last_login_at=datetime.utcnow()
     )
-    
-    # カテゴリーがあれば設定
-    if hasattr(user, 'categories') and user_data.categories:
-        user.set_categories_list(user_data.categories)
     
     # データベースに保存
     db.add(user)
