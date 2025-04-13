@@ -28,6 +28,7 @@ except ImportError as e:
 
 # ───────── データベース関連のインポート ─────────
 from app.core.database import engine, Base
+from sqlalchemy import inspect
 
 app = FastAPI(
     title="CollaboGames Backend API",
@@ -47,7 +48,13 @@ app.add_middleware(
 # ───────── Startup イベント：テーブル自動生成 ─────────
 @app.on_event("startup")
 async def startup_event():
-    Base.metadata.create_all(bind=engine)
+    # テーブルが存在するか確認し、存在しない場合のみ作成
+    inspector = inspect(engine)
+    if not inspector.has_table("user_project_favorites"):
+        print("テーブル 'user_project_favorites' が存在しません。テーブルを作成します。")
+        Base.metadata.create_all(bind=engine)
+    else:
+        print("テーブルは既に存在しています。スキーマ変更は行いません。")
 
 # ───────── 各種ルーターの追加 ─────────
 app.include_router(auth_router, prefix="/api/auth", tags=["認証"])

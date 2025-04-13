@@ -18,7 +18,7 @@ router = APIRouter()
 
 @router.get("/", response_model=ProjectListResponse)
 def get_projects(user_id: int, db: Session = Depends(get_db)):
-    # 新着プロジェクトを取得（co_creation_projects テーブルから）
+    # 新着プロジェクトを取得
     new_projects = (
         db.query(Project)
         .order_by(Project.created_at.desc())
@@ -26,15 +26,16 @@ def get_projects(user_id: int, db: Session = Depends(get_db)):
         .all()
     )
 
-    # お気に入りプロジェクト：UserFavoriteProject を JOIN してフィルター
+    # お気に入りプロジェクト（テーブル名を修正）
     favorite_projects = (
         db.query(Project)
-        .join(UserFavoriteProject)
+        .join(UserFavoriteProject, Project.project_id == UserFavoriteProject.project_id)
         .filter(UserFavoriteProject.user_id == user_id)
         .order_by(Project.created_at.desc())
         .limit(8)
         .all()
     )
+    
 
     # プロジェクト総数を取得
     total_projects = db.query(Project).count()
