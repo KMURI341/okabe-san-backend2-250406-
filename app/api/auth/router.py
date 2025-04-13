@@ -1,11 +1,11 @@
-from datetime import timedelta
+# app/api/auth/router.py
+from datetime import timedelta, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-# 相対インポートに変更
 from ...core.database import get_db
 from ...core.security import get_password_hash, ACCESS_TOKEN_EXPIRE_MINUTES
 from .jwt import authenticate_user, create_access_token
@@ -35,17 +35,18 @@ def login_for_access_token(
     # アクセストークンを生成
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.id}, 
+        data={"sub": user.user_id}, 
         expires_delta=access_token_expires
     )
     
     return {
         "access_token": access_token, 
         "token_type": "bearer",
-        "user_id": user.id,
+        "user_id": user.user_id,
         "user_name": user.name
     }
 
+# app/api/auth/router.py の login 関数を修正
 @router.post("/login", response_model=Token)
 def login(
     username: str,
@@ -55,28 +56,44 @@ def login(
     """
     ユーザー名とパスワードでログイン
     """
+    print(f"ログインリクエスト受信: username={username}, password={'*' * len(password)}")
+    
     # ユーザーを認証
     user = authenticate_user(db, username, password)
     
     if not user:
+        print(f"認証失敗: ユーザー '{username}' の認証に失敗しました")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="ユーザー名またはパスワードが無効です",
         )
     
+    print(f"認証成功: ユーザー '{username}' (ID: {user.user_id})")
+    
+    # 最終ログイン時間を更新
+    from datetime import datetime
+    user.last_login_at = datetime.utcnow()
+    db.commit()
+    
     # アクセストークンを生成
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.id}, 
+        data={"sub": user.user_id},
         expires_delta=access_token_expires
     )
     
-    return {
+    print(f"トークン発行: user_id={user.user_id}, name={user.name}")
+    
+    # レスポンスデータを作成
+    response_data = {
         "access_token": access_token, 
         "token_type": "bearer",
-        "user_id": user.id,
+        "user_id": user.user_id,
         "user_name": user.name
     }
+    print(f"レスポンスデータ: {response_data}")
+    
+    return response_data
 
 @router.post("/register", response_model=Token)
 def register_user(
@@ -86,6 +103,7 @@ def register_user(
     """
     新規ユーザー登録
     """
+    print(f"受信データ: {user_data}")
     # パスワード確認
     if user_data.password != user_data.confirm_password:
         raise HTTPException(
@@ -101,14 +119,18 @@ def register_user(
             detail="このユーザー名は既に使用されています",
         )
     
+    now = datetime.utcnow()
+    
     # 新しいユーザーを作成
     user = User(
         name=user_data.name,
         hashed_password=get_password_hash(user_data.password),
+        point_total=0,  # point_total フィールドを使用
+        last_login_at=now  # 最終ログイン時間を設定
     )
     
     # カテゴリーがあれば設定
-    if user_data.categories:
+    if hasattr(user, 'categories') and user_data.categories:
         user.set_categories_list(user_data.categories)
     
     # データベースに保存
@@ -119,13 +141,13 @@ def register_user(
     # アクセストークンを生成
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.id}, 
+        data={"sub": user.user_id},
         expires_delta=access_token_expires
     )
     
     return {
         "access_token": access_token, 
         "token_type": "bearer",
-        "user_id": user.id,
+        "user_id": user.user_id,
         "user_name": user.name
     }

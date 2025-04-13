@@ -73,7 +73,7 @@ def update_user_info(
     
     # レスポンスを構築
     return {
-        "id": current_user.id,
+        "id": current_user.user_id,
         "name": current_user.name,
         "categories": categories,
         "points": current_user.points,
